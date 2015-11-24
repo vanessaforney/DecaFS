@@ -17,7 +17,7 @@ ifeq ($(COVERAGE),yes)
 	LDFLAGS += --coverage
 endif
 
-CXXFLAGS := $(CFLAGS) -std=c++0x -fno-exceptions -fno-rtti
+CXXFLAGS := $(CFLAGS) -std=c++0x -fno-exceptions -fno-rtti -Wno-narrowing
 
 ifeq ($(CXX),clang++)
 	LDFLAGS += -flto
