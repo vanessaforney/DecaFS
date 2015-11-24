@@ -11,8 +11,6 @@
 #define NETWORK_WRITE 0
 
 struct NetworkChunk {
-  int network_type; /* Whether the chunk is DELETE or WRITE. */
-  uint32_t request_id;
   int node_id;
   struct file_chunk chunk;
   int fd;
@@ -46,4 +44,10 @@ ssize_t process_write_chunk (uint32_t request_id, int fd, int file_id,
  */
 ssize_t process_delete_chunk (uint32_t request_id, int file_id, int node_id,
                               int stripe_id, int chunk_num);
+
+/*
+ * Completes all writes that occurred when the node was down.
+ */
+void remove_node_down(int node_id);
+
 #endif

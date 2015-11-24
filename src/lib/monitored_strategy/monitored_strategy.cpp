@@ -16,11 +16,10 @@ extern "C" void monitor_func () {
 
 extern "C" void node_failure_handler_func (uint32_t node_number) {
   printf ("Handling node failure...\n");
-  // Add custom processing to be done when node node_number goes down.
 }
 
 extern "C" void node_up_handler_func (uint32_t node_number) {
   printf ("Handling node coming online...\n");
-  // Add custom processing to be done when node node_number goes up.
+  remove_node_down(node_number);
 }
 

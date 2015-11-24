@@ -98,6 +98,7 @@ void IO_Manager::process_write_stripe (uint32_t request_id,
   get_first_chunk (&chunk_id, chunk_size, &chunk_offset, offset);
 
   while (bytes_written < count) {
+    bool write_main_node = false, write_replica_node = false;
     struct file_chunk cur_chunk = {file_id, stripe_id, chunk_id};
     
     // If the chunk does not exists, create it
@@ -109,8 +110,7 @@ void IO_Manager::process_write_stripe (uint32_t request_id,
 
     // If the replica does not exist, create it
     if (!chunk_replica_exists (cur_chunk)) {
-      replica_node_id = put_replica (file_id, pathname, stripe_id,
-                                     chunk_id);
+      replica_node_id = put_replica (file_id, pathname, stripe_id, chunk_id);
       printf ("\tchunk replica doesn't exist. Preparing to send chunk replica to node %d\n", 
                  replica_node_id);
       chunk_to_replica_node[cur_chunk] = replica_node_id;
@@ -128,34 +128,44 @@ void IO_Manager::process_write_stripe (uint32_t request_id,
       write_size = count - bytes_written;
     }
 
+    // WRITES MAIN NODE
     // Send the write to the node
     printf ("\tprocessing chunk %d (sending to node %d)\n", chunk_id, node_id);
     write_result = process_write_chunk (request_id, 0, file_id, node_id, stripe_id,
                                         chunk_id, chunk_offset, (uint8_t *)buf
                                         + bytes_written, write_size);
     printf ("\t\treceived %d from network call.\n", write_result);
-    // If the write failed
+
+    // If the main node write failed, set the node to "down", otherwise increment chunks written
     if (write_result == NODE_FAILURE) {
-      // Set the node to "down"
       set_node_down (node_id);
     } else {
-      // Send the write to the replica node
-      printf ("\tprocessing chunk replica %d (sending to node %d)\n", chunk_id, replica_node_id);
-      write_result = process_write_chunk (replica_request_id, 0, file_id, replica_node_id, stripe_id,
-                                          chunk_id, chunk_offset, (uint8_t *)buf
-                                          + bytes_written, write_size);
-      // if the replica write failed
-      if (write_result == NODE_FAILURE) {
-        // Set the node to "down"
-        set_node_down (replica_node_id);
-      }
+      write_main_node = true;
+      (*chunks_written)++;
+    }
 
-      // update counters
+    printf("WRITE REPLICA NODE: %d\n", write_size);
+    // WRITES REPLICA NODE
+    // Send the write to the replica node
+    printf ("\tprocessing chunk replica %d (sending to node %d)\n", chunk_id, replica_node_id);
+    write_result = process_write_chunk (replica_request_id, 0, file_id, replica_node_id, stripe_id,
+                                        chunk_id, chunk_offset, (uint8_t *)buf
+                                        + bytes_written, write_size);
+    printf ("\t\treceived %d from network call.\n", write_result);
+
+    // If the replica node write failed, set the node to "down", otherwise increment chunks written
+    if (write_result == NODE_FAILURE) {
+      set_node_down (replica_node_id);
+    } else {
+      write_replica_node = true;
+      (*replica_chunks_written)++;
+    }
+
+    // Update counters if either main or replica node written
+    if (write_main_node || write_replica_node) {
       chunk_offset = 0;
       bytes_written += write_size;
       chunk_id++;
-      (*chunks_written)++;
-      (*replica_chunks_written)++;
     }
   }
 }

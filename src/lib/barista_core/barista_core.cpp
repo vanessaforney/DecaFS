@@ -31,6 +31,8 @@ std::map<struct write_request, struct write_request_info> active_write_requests;
 
 std::map<uint32_t, struct request_info> active_delete_requests;
 
+std::set<uint32_t> recover_node_request_ids;
+
 // ------------------------IO Manager Call Throughs---------------------------
 extern "C" uint32_t process_read_stripe (uint32_t request_id, uint32_t file_id,
                                          char *pathname, uint32_t stripe_id,
@@ -320,6 +322,14 @@ void get_first_stripe (uint32_t *id, int *stripe_offset, uint32_t stripe_size,
   *stripe_offset = offset_remaining;
 }
 
+void add_recover_node_request_id(uint32_t request_id) {
+   recover_node_request_ids.insert(request_id);
+}
+
+void remove_recover_node_request_id(uint32_t request_id) {
+   recover_node_request_ids.erase(request_id);
+}
+
 bool read_request_exists (uint32_t request_id) {
   return (active_read_requests.find (request_id) != active_read_requests.end());
 }
@@ -337,6 +347,7 @@ bool delete_request_exists (uint32_t request_id) {
 }
 
 void check_read_complete (uint32_t request_id) {
+  // If a read request exists with the given request id, read request is complete
   assert (read_request_exists (request_id));
   if (active_read_requests[request_id].info.chunks_expected == 0) {
     return;
@@ -349,6 +360,7 @@ void check_read_complete (uint32_t request_id) {
     std::map<struct file_chunk, struct read_buffer*> packet_map = 
         active_read_requests[request_id].response_packets;
     std::map<struct file_chunk, struct read_buffer*>::iterator it = packet_map.begin();
+    
     while (it != packet_map.end()) {
       struct read_buffer *cur_packet = it->second;
       memcpy (buffer_offset, cur_packet->buf, cur_packet->size);
@@ -357,6 +369,7 @@ void check_read_complete (uint32_t request_id) {
       it++;
       delete (cur_packet);
     }
+
     if (send_read_result (active_read_requests[request_id].info.client,
                           active_read_requests[request_id].fd, count,
                           active_read_requests[request_id].buf) < 0) {
@@ -371,11 +384,6 @@ void check_write_complete (uint32_t request_id) {
   struct write_request request = write_request_lookups[request_id];
   
   printf ("(BARISTA) Check write complete\n");
-
-  if (active_write_requests[request].info.chunks_expected == 0) {
-    printf ("\tall stripes have not been sent yet, write not complete.\n");
-    return;
-  }
 
   if (active_write_requests[request].info.chunks_expected ==
       active_write_requests[request].info.chunks_received &&
@@ -742,9 +750,19 @@ extern "C" void write_file (int fd, const void *buf, size_t count, struct client
 }
 
 extern "C" void write_response_handler (WriteChunkResponse *write_response) {
+  // Exits early if request id is from the recovery nodes
+  if (std::find(recover_node_request_ids.begin(), 
+                recover_node_request_ids.end(), write_response->id) !=
+      recover_node_request_ids.end()) {
+     remove_recover_node_request_id(write_response->id);
+     return;
+  }
+
   assert (write_request_exists (write_response->id));
 
   struct write_request request = write_request_lookups[write_response->id];
+  int main_chunks = active_write_requests[request].info.chunks_expected;
+  int replica_chunks = active_write_requests[request].replica_info.chunks_expected;
 
   printf ("(BARISTA) Processing write response for file %d.\n",
              active_write_requests[request].info.file_id);
@@ -752,12 +770,18 @@ extern "C" void write_response_handler (WriteChunkResponse *write_response) {
   // If this is a primary chunk response
   if (write_response->id == request.request_id) {
     active_write_requests[request].info.chunks_received++;
-    active_write_requests[request].count += write_response->count;
+    if (main_chunks >= replica_chunks) {
+      active_write_requests[request].count += write_response->count;
+    }
   }
   // Replica response
   else {
     active_write_requests[request].replica_info.chunks_received++;
-  }
+    if (main_chunks < replica_chunks) {
+      active_write_requests[request].count += write_response->count;
+    }
+  }  
+
   check_write_complete(write_response->id);
 }
 
