@@ -1,20 +1,3 @@
-Skip to content
-This repository  
-Search
-Pull requests
-Issues
-Gist
- @vanessaforney
- Unwatch 2
-  Star 0
- Fork 6 vanessaforney/DecaFS
-forked from chrislupo/DecaFS
- Code  Pull requests 0  Wiki  Pulse  Graphs  Settings
-Branch: datarecovery Find file Copy pathDecaFS/src/lib/io_manager/io_manager.cpp
-426f9f1  6 days ago
- ngarg Passes current access.cpp test with bringing nodes down.
-3 contributors @hallielaine @PeterFaiman @vanessaforney
-RawBlameHistory     338 lines (288 sloc)  11.8 KB
 #include "io_manager.h"
 
 IO_Manager::IO_Manager() {
@@ -317,5 +300,3 @@ void IO_Manager::get_first_chunk (uint32_t *id, uint32_t chunk_size, int *chunk_
   }
   *chunk_offset = offset;
 }
-Status API Training Shop Blog About Pricing
-© 2015 GitHub, Inc. Terms Privacy Security Contact Help
