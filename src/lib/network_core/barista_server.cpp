@@ -199,6 +199,7 @@ void BaristaServer::handleMessageFromClient(ConnectionToClient* client) {
       auto readResponse = new ReadChunkResponse(buffer_ptr, packet_size);
       std::cout << *readResponse << std::endl;
       process_read_chunk_response(readResponse);
+      printf("EXITING FUNCTION\n");
       read_response_handler(readResponse);
       break;
     }

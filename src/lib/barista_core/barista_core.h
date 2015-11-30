@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <math.h>
 
 #include <limits>
 
@@ -137,6 +138,8 @@ struct write_request_info {
     this->count = 0;
   }
 };
+
+extern "C" bool chunk_exists (struct file_chunk chunk);
 
 extern "C" const char *get_size_error_message (const char *type, const char *value);
 
@@ -270,4 +273,11 @@ extern "C" void move_chunk_replica (const char* pathname, uint32_t stripe_id,
 extern "C" void fmove_chunk_replica (uint32_t file_id, uint32_t stripe_id,
                                      uint32_t chunk_num, uint32_t dest_node,
                                      struct client client);
+
+/*
+ * Adds and removes recover node request id.
+ */
+extern "C" void add_recover_node_request_id(uint32_t request_id);
+extern "C" void remove_recover_node_request_id(uint32_t request_id);
+
 #endif

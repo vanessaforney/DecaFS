@@ -1,12 +1,27 @@
+#ifndef __ACCESS_H__
+#define __ACCESS_H__
+
 #include <sys/types.h>
 
 #include "network_core/barista_network_helper.h"
 #include "barista_core/barista_core.h"
 
 #define DATA_NOT_FOUND -1
-#define READ 0
-#define WRITE 1
+#define NETWORK_READ 0
+#define NETWORK_WRITE 1
 
+struct NetworkChunk {
+  int node_id;
+  struct file_chunk chunk;
+  int fd;
+  int offset;
+  int count;
+};
+
+
+/*
+ * Reads the chunk responses and updates the buffer if appropriate network id.
+ */
 void process_read_chunk_response(ReadChunkResponse *read_chunk_response);
 
 /*
@@ -35,4 +50,9 @@ ssize_t process_write_chunk (uint32_t request_id, int fd, int file_id,
 ssize_t process_delete_chunk (uint32_t request_id, int file_id, int node_id,
                               int stripe_id, int chunk_num);
 
+/*
+ * Completes all writes that occurred when the node was down.
+ */
 void remove_node_down(int node_id);
+
+#endif

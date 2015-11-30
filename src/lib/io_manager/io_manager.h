@@ -41,7 +41,6 @@ class IO_Manager {
     const char *replica_metadata_filename = "io_manager_replica_metadata.dat";
     
     // Helper Functions
-    bool chunk_exists (struct file_chunk);
     bool chunk_replica_exists (struct file_chunk);
     //Given a file_id, list all chunks that are part of the file
     std::vector<struct file_chunk> get_all_chunks (uint32_t file_id);
@@ -142,6 +141,11 @@ class IO_Manager {
      */
     int stat_replica_name (char *pathname, struct decafs_file_stat *buf);
     int stat_replica_id (uint32_t file_id, struct decafs_file_stat *buf);
+
+    /*
+     * Determines if a chunk exists.
+     */
+    bool chunk_exists (struct file_chunk);
 
     /*
      *	Ensure that all filedata is written to disk.

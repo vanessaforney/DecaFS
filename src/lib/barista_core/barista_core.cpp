@@ -11,6 +11,8 @@
 IO_Manager io_manager;
 Persistent_Metadata *persistent_metadata = Persistent_Metadata::get_instance();
 Volatile_Metadata volatile_metadata;
+std::map<int, uint32_t> fd_to_stripe_id;
+uint32_t global_stripe_id = 0;
 
 // Test Accessors
 #ifdef MOCK_PERSISTENT_METADATA
@@ -30,6 +32,8 @@ std::map<uint32_t, struct write_request> write_request_lookups;
 std::map<struct write_request, struct write_request_info> active_write_requests;
 
 std::map<uint32_t, struct request_info> active_delete_requests;
+
+std::set<uint32_t> recover_node_request_ids;
 
 // ------------------------IO Manager Call Throughs---------------------------
 extern "C" uint32_t process_read_stripe (uint32_t request_id, uint32_t file_id,
@@ -101,6 +105,10 @@ extern "C" int stat_replica_id (uint32_t file_id, struct decafs_file_stat *buf) 
 
 extern "C" void sync () {
   return io_manager.sync();
+}
+
+extern "C" bool chunk_exists (struct file_chunk chunk) {
+  return io_manager.chunk_exists(chunk);
 }
 
 // ------------------------Persistent Metadata Call Throughs---------------------------
@@ -309,15 +317,27 @@ extern "C" void run_node_up_handler (uint32_t node_number) {
  * on the global offset, in context of stripe size.
  */
 void get_first_stripe (uint32_t *id, int *stripe_offset, uint32_t stripe_size,
-                       int offset) {
-  int offset_remaining = offset;
-  *id = STRIPE_ID_INIT;
-
-  while (offset_remaining > (int)stripe_size) {
-    (*id)++;
-    offset_remaining -= stripe_size;
+                       int fd, int file_size, int chunk_size) {
+  if (fd_to_stripe_id.count(fd)) {
+    // If key exists sets stripe id to the key
+    *id = fd_to_stripe_id.find(fd)->second;
+  } else {
+    // Else sets stripe to next available id and increments global stripe id
+    *id = global_stripe_id;
+    fd_to_stripe_id.insert({fd, *id});
+    int num_stripes = ceil(((float) file_size) / chunk_size / stripe_size);
+    global_stripe_id += num_stripes;
   }
-  *stripe_offset = offset_remaining;
+
+  *stripe_offset = 0;
+}
+
+void add_recover_node_request_id(uint32_t request_id) {
+  recover_node_request_ids.insert(request_id);
+}
+
+void remove_recover_node_request_id(uint32_t request_id) {
+  recover_node_request_ids.erase(request_id);
 }
 
 bool read_request_exists (uint32_t request_id) {
@@ -597,7 +617,7 @@ extern "C" void read_file (int fd, size_t count, struct client client) {
   active_read_requests[request_id] = read_request_info (client, inst.file_id,
                                                         fd, buf);  
   get_first_stripe (&stripe_id, &stripe_offset, stat.stripe_size,
-                    file_offset);
+                    fd, bytes_read, stat.chunk_size);
 
   while (bytes_read < (int)count) {
     printf ("file cursor: %d\n", get_file_cursor(fd));
@@ -630,6 +650,13 @@ extern "C" void read_file (int fd, size_t count, struct client client) {
 }
 
 extern "C" void read_response_handler (ReadChunkResponse *read_response) {
+  if (std::find(recover_node_request_ids.begin(), 
+                recover_node_request_ids.end(), read_response->id) !=
+      recover_node_request_ids.end()) {
+    remove_recover_node_request_id(read_response->id);
+    return;
+  }
+
   assert (read_request_exists (read_response->id));
   
   struct file_chunk chunk = {read_response->file_id, read_response->stripe_id,
@@ -700,8 +727,9 @@ extern "C" void write_file (int fd, const void *buf, size_t count, struct client
                                                        fd);  
   
   // TODO: make some assertion about max write size here
-  get_first_stripe (&stripe_id, &stripe_offset, stat.stripe_size, file_offset);
-          
+   get_first_stripe (&stripe_id, &stripe_offset, stat.stripe_size,
+                    fd, count, stat.chunk_size);
+
   while (bytes_written < (int)count) {
     if (count - bytes_written > stat.stripe_size - stripe_offset) {
       write_size = stat.stripe_size - stripe_offset;
@@ -742,6 +770,13 @@ extern "C" void write_file (int fd, const void *buf, size_t count, struct client
 }
 
 extern "C" void write_response_handler (WriteChunkResponse *write_response) {
+  if (std::find(recover_node_request_ids.begin(), 
+                recover_node_request_ids.end(), write_response->id) !=
+      recover_node_request_ids.end()) {
+    remove_recover_node_request_id(write_response->id);
+    return;
+  }
+
   assert (write_request_exists (write_response->id));
 
   struct write_request request = write_request_lookups[write_response->id];

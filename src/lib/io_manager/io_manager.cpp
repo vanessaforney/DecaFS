@@ -1,20 +1,3 @@
-Skip to content
-This repository  
-Search
-Pull requests
-Issues
-Gist
- @vanessaforney
- Unwatch 2
-  Star 0
- Fork 6 vanessaforney/DecaFS
-forked from chrislupo/DecaFS
- Code  Pull requests 0  Wiki  Pulse  Graphs  Settings
-Branch: datarecovery Find file Copy pathDecaFS/src/lib/io_manager/io_manager.cpp
-426f9f1  6 days ago
- ngarg Passes current access.cpp test with bringing nodes down.
-3 contributors @hallielaine @PeterFaiman @vanessaforney
-RawBlameHistory     338 lines (288 sloc)  11.8 KB
 #include "io_manager.h"
 
 IO_Manager::IO_Manager() {
@@ -96,7 +79,7 @@ void IO_Manager::process_write_stripe (uint32_t request_id,
                                        uint32_t chunk_size, const void *buf,
                                        int offset, size_t count) {
   uint32_t chunk_id, bytes_written = 0, write_size = 0;
-  int chunk_offset, node_id, replica_node_id, write_result;
+  int chunk_offset, node_id, write_result;
 
   assert (((int)count - offset) <= (int)stripe_size);
   printf ("\n(BARISTA) Process Write Stripe\n");
@@ -113,15 +96,7 @@ void IO_Manager::process_write_stripe (uint32_t request_id,
       chunk_to_node[cur_chunk] = node_id;
     }
 
-    // If the replica does not exist, create it
-    if (!chunk_replica_exists (cur_chunk)) {
-      replica_node_id = put_replica (file_id, pathname, stripe_id, chunk_id);
-      printf ("\tchunk replica doesn't exist. Preparing to send chunk replica to node %d\n", 
-                 replica_node_id);
-      chunk_to_replica_node[cur_chunk] = replica_node_id;
-    }
-
-    // Ensure that we have the proper node and replica id's to send data to
+    // Ensure that we have the proper node id to send data to
     node_id = chunk_to_node[cur_chunk];
 
     // Determine the size of the write
@@ -317,5 +292,3 @@ void IO_Manager::get_first_chunk (uint32_t *id, uint32_t chunk_size, int *chunk_
   }
   *chunk_offset = offset;
 }
-Status API Training Shop Blog About Pricing
-© 2015 GitHub, Inc. Terms Privacy Security Contact Help

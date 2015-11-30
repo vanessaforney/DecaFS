@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
   }
   sleep(1);
 
-  /* Writes to file. */
+  // /* Writes to file. */
   printf("------------ DECAFS CLIENT WRITE TEST 1 ------------\n");
   bytes = client.write(fd, first_write, strlen(first_write));
   check_num_bytes(bytes, strlen(first_write));
@@ -58,11 +58,11 @@ int main(int argc, char** argv) {
   sleep(10);
 
   /* Reads from the file. */
-  // printf("------------ DECAFS CLIENT READ TEST 1 ------------\n");
-  // client.lseek(fd, 0, SEEK_SET);
-  // bytes = client.read(fd, test_read, strlen(first_write));
-  // check_num_bytes(bytes, strlen(first_write));
-  // sleep(1);
+  printf("------------ DECAFS CLIENT READ TEST 1 ------------\n");
+  client.lseek(fd, 0, SEEK_SET);
+  bytes = client.read(fd, test_read, strlen(first_write));
+  check_num_bytes(bytes, strlen(first_write));
+  sleep(1);
 
   /* Writes to file. */
   printf("------------ DECAFS CLIENT WRITE TEST 2 ------------\n");
