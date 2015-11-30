@@ -1,3 +1,20 @@
+Skip to content
+This repository  
+Search
+Pull requests
+Issues
+Gist
+ @vanessaforney
+ Unwatch 2
+  Star 0
+ Fork 6 vanessaforney/DecaFS
+forked from chrislupo/DecaFS
+ Code  Pull requests 0  Wiki  Pulse  Graphs  Settings
+Branch: datarecovery Find file Copy pathDecaFS/src/lib/io_manager/io_manager.cpp
+426f9f1  6 days ago
+ ngarg Passes current access.cpp test with bringing nodes down.
+3 contributors @hallielaine @PeterFaiman @vanessaforney
+RawBlameHistory     338 lines (288 sloc)  11.8 KB
 #include "io_manager.h"
 
 IO_Manager::IO_Manager() {
@@ -7,10 +24,7 @@ IO_Manager::IO_Manager() {
 void IO_Manager::init(char *metadata_path) {
   std::string node_metadata_file = std::string(metadata_path) +
                                    std::string(node_metadata_filename);
-  std::string replica_metadata_file = std::string(metadata_path) +
-                                      std::string(replica_metadata_filename);
   chunk_to_node.open (node_metadata_file.c_str());
-  chunk_to_replica_node.open (replica_metadata_file.c_str());
 }
 
 uint32_t IO_Manager::process_read_stripe (uint32_t request_id, uint32_t file_id,
@@ -39,12 +53,6 @@ uint32_t IO_Manager::process_read_stripe (uint32_t request_id, uint32_t file_id,
 
     // The chunk exists, so set the node_id
     node_id = chunk_to_node[cur_chunk];
-
-    // If the node isn't up, switch to the replica
-    if (!is_node_up (node_id)) {
-      assert (chunk_replica_exists (cur_chunk));
-      node_id = chunk_to_replica_node[cur_chunk];
-    }
    
     // Determine how much data to read from the current chunk
     if (count - bytes_read > chunk_size - chunk_offset) {
@@ -69,14 +77,12 @@ uint32_t IO_Manager::process_read_stripe (uint32_t request_id, uint32_t file_id,
       // Mark the node as "down"
       set_node_down (node_id);
     }
-    // The read suceeded, so move on
-    else {
-      // update counters
-      chunk_offset = 0;
-      bytes_read += read_size;
-      chunk_id++;
-      num_chunks++;
-    }
+
+    // update counters
+    chunk_offset = 0;
+    bytes_read += read_size;
+    chunk_id++;
+    num_chunks++;
   }
   return num_chunks;
 }
@@ -109,8 +115,7 @@ void IO_Manager::process_write_stripe (uint32_t request_id,
 
     // If the replica does not exist, create it
     if (!chunk_replica_exists (cur_chunk)) {
-      replica_node_id = put_replica (file_id, pathname, stripe_id,
-                                     chunk_id);
+      replica_node_id = put_replica (file_id, pathname, stripe_id, chunk_id);
       printf ("\tchunk replica doesn't exist. Preparing to send chunk replica to node %d\n", 
                  replica_node_id);
       chunk_to_replica_node[cur_chunk] = replica_node_id;
@@ -118,7 +123,6 @@ void IO_Manager::process_write_stripe (uint32_t request_id,
 
     // Ensure that we have the proper node and replica id's to send data to
     node_id = chunk_to_node[cur_chunk];
-    replica_node_id = chunk_to_replica_node[cur_chunk];
 
     // Determine the size of the write
     if (count - bytes_written > chunk_size - chunk_offset) {
@@ -128,44 +132,22 @@ void IO_Manager::process_write_stripe (uint32_t request_id,
       write_size = count - bytes_written;
     }
 
+    // WRITES MAIN NODE
     // Send the write to the node
-                        // ADD FD HERE
     printf ("\tprocessing chunk %d (sending to node %d)\n", chunk_id, node_id);
     write_result = process_write_chunk (request_id, 0, file_id, node_id, stripe_id,
                                         chunk_id, chunk_offset, (uint8_t *)buf
                                         + bytes_written, write_size);
     printf ("\t\treceived %d from network call.\n", write_result);
-    // If the write failed
+
+    // If the main node write failed, set the node to "down", otherwise increment chunks written
     if (write_result == NODE_FAILURE) {
-      // Set the node to "down" and try again
       set_node_down (node_id);
-    }
-    else {
-      // Send the write to the replica node
-                          // ADD FD HERE
-      printf ("\tprocessing chunk replica %d (sending to node %d)\n", chunk_id, 
-                 replica_node_id);
-      write_result = process_write_chunk (replica_request_id, 0, file_id, replica_node_id, stripe_id,
-                                          chunk_id, chunk_offset, (uint8_t *)buf
-                                          + bytes_written, write_size);
-      // if the replica write failed
-      if (write_result == NODE_FAILURE) {
-        // Set the node to "down"
-        set_node_down (replica_node_id);
-        // Choose a different replica
-        replica_node_id = put_replica (file_id, pathname, stripe_id,
-                                       chunk_id);
-        // Re-write the data
-        process_write_chunk (replica_request_id, 0, file_id, replica_node_id, stripe_id,
-                             chunk_id, chunk_offset, (uint8_t *)buf
-                             + bytes_written, write_size);
-      }
-      // update counters
+    } else {
+      (*chunks_written)++;
       chunk_offset = 0;
       bytes_written += write_size;
       chunk_id++;
-      (*chunks_written)++;
-      (*replica_chunks_written)++;
     }
   }
 }
@@ -335,3 +317,5 @@ void IO_Manager::get_first_chunk (uint32_t *id, uint32_t chunk_size, int *chunk_
   }
   *chunk_offset = offset;
 }
+Status API Training Shop Blog About Pricing
+© 2015 GitHub, Inc. Terms Privacy Security Contact Help
