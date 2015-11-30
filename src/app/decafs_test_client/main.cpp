@@ -1,4 +1,3 @@
-
 #include "network_core/barista_server.h"
 #include "network_core/espresso_client.h"
 #include "../decafs_barista/decafs_barista.h"
@@ -8,126 +7,99 @@
 #include <thread>
 #include "network_core/barista_network_helper.h"
 
+void check_num_bytes(int actual, int expected) {
+  if (actual != expected) {
+    printf("actual: %d expected: %d\n", actual, expected);
+    exit(-1);
+  }
+}
+
 int main(int argc, char** argv) {
-  int port = 3899;
+  int port = 3899, fd, bytes, close;
   char filename[] = "testfile";
-  DecafsClient client("10.0.0.100", port, 2);
+  char test_read[1000];
+  char first_write[] = "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 "
+    "22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 "
+    "46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 "
+    "70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 "
+    "94 95 96 97 98 99 100";
+  char second_write[] = "10 9 8 7 6 5 4 3 2 1";
+  char expected[] = "10 9 8 7 6 5 4 3 2 1 11 12 13 14 15 16 17 18 19 20 21 22 "
+    "23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 "
+    "47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 "
+    "71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 "
+    "95 96 97 98 99 100";
+
+  /* Opens DecaFS client. */
+  DecafsClient client("localhost", port, 2);
   client.openConnection();
-
   sleep(1);
 
-  // OPEN
-  std::cout << "------------ DECAFS CLIENT OPEN TEST ----------" << std::endl;
-  int fd = client.open(filename, O_RDWR);
-  std::cout << "open returned: " << fd << std::endl;
-  sleep(1);
-
-  // WRITE
-  std::cout << "------------ DECAFS CLIENT WRITE TEST ----------" << std::endl;
-  char testwrite[] = "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100";
-  int bytes_written = client.write(fd, testwrite, strlen(testwrite));
-  std::cout << "write returned: " << bytes_written << std::endl;
-  sleep(1);
-  
-  // WRITE
-  std::cout << "------------ DECAFS CLIENT WRITE (0) TEST ----------" << std::endl;
-  bytes_written = client.write(fd, testwrite, 0);
-  std::cout << "write returned: " << bytes_written << std::endl;
-  sleep(1);
-
-  // READ
-  std::cout << "------------ DECAFS CLIENT READ TEST ----------" << std::endl;
-  char testread[1000];
-  int bytes_read = client.read(fd, testread, strlen(testwrite));
-  std::cout << "read returned: " << bytes_read << std::endl;
-  sleep(1);
-
-  // CLOSE
-  std::cout << "------------ DECAFS CLIENT CLOSE TEST ----------" << std::endl;
-  int close = client.close(fd);
-  std::cout << "close returned: " << close << std::endl;
-  sleep(1);
-  
-  // OPEN
-  std::cout << "------------ DECAFS CLIENT OPEN TEST ----------" << std::endl;
+  /* Opens file. */
+  printf("------------ DECAFS CLIENT OPEN TEST ------------\n");
   fd = client.open(filename, O_RDWR);
-  std::cout << "open returned: " << fd << std::endl;
-  sleep(1);
-  
-  // READ
-  std::cout << "------------ DECAFS CLIENT READ (0) TEST ----------" << std::endl;
-  bytes_read = client.read(fd, testread, 0);
-  std::cout << "read returned: " << bytes_read << std::endl;
+  if (fd <= 0) {
+    printf("open returned: %d\n", fd);
+  }
   sleep(1);
 
-  // READ
-  std::cout << "------------ DECAFS CLIENT READ TEST ----------" << std::endl;
-  bytes_read = client.read(fd, testread, strlen(testwrite));
-  std::cout << "read returned: " << bytes_read << std::endl;
+  /* Writes to file. */
+  printf("------------ DECAFS CLIENT WRITE TEST 1 ------------\n");
+  bytes = client.write(fd, first_write, strlen(first_write));
+  check_num_bytes(bytes, strlen(first_write));
   sleep(1);
- 
-  // CLOSE
-  std::cout << "------------ DECAFS CLIENT CLOSE TEST ----------" << std::endl;
+
+  /* Prints file storage stat. */
+  client.file_storage_stat(filename);
+  sleep(1);
+
+  /* Take node down. */
+  printf("------------ TAKE OFFLINE NOW! ------------\n");
+  sleep(10);
+
+  /* Reads from the file. */
+  // printf("------------ DECAFS CLIENT READ TEST 1 ------------\n");
+  // client.lseek(fd, 0, SEEK_SET);
+  // bytes = client.read(fd, test_read, strlen(first_write));
+  // check_num_bytes(bytes, strlen(first_write));
+  // sleep(1);
+
+  /* Writes to file. */
+  printf("------------ DECAFS CLIENT WRITE TEST 2 ------------\n");
+  client.lseek(fd, 0, SEEK_SET);
+  bytes = client.write(fd, second_write, strlen(second_write));
+  check_num_bytes(bytes, strlen(second_write));
+  sleep(1);
+
+  /* Bring node up. */
+  printf("------------ BRING ONLINE NOW! ------------\n");
+  sleep(10);
+
+  /* Reads from the file. */
+  printf("------------ DECAFS CLIENT READ TEST 2 ------------\n");
+  client.lseek(fd, 0, SEEK_SET);
+  bytes = client.read(fd, test_read, strlen(first_write));
+  check_num_bytes(bytes, strlen(first_write));
+  sleep(1);
+  
+  /* Check result. */
+  if (strncmp(test_read, expected, strlen(expected)) != 0) {
+    printf("TEST FAIL! :(\n");
+    printf("Read buffer:\n");
+    printf("%s\n", test_read);
+    printf("Expected buffer:\n");
+    printf("%s\n", second_write);
+  } else {
+    printf("TEST PASS! :)\n");
+  }
+  
+  /* Closed the file. */
+  printf("------------ DECAFS CLIENT CLOSE TEST ------------\n");
   close = client.close(fd);
-  std::cout << "close returned: " << close << std::endl;
-  sleep(1);
-  
-  // FILE STORAGE STAT
-  std::cout << "------------ DECAFS CLIENT FILE STORAGE STAT TEST ----------" << std::endl;
-  client.file_storage_stat(filename);
+  if (close < 0) {
+    printf("Close failed: %d\n", close);
+  }
   sleep(1);
 
-  // OPEN
-  std::cout << "------------ DECAFS CLIENT OPEN TEST ----------" << std::endl;
-  fd = client.open(filename, O_RDWR);
-  std::cout << "open returned: " << fd << std::endl;
-  sleep(1);
-  
-  // SEEK
-  std::cout << "------------ DECAFS CLIENT SEEK TEST ----------" << std::endl;
-  int offset = client.lseek(fd, 7, SEEK_SET);
-  std::cout << "seek returned: " << offset << std::endl;
-  sleep(1);
-
-  // WRITE
-  std::cout << "------------ DECAFS CLIENT WRITE TEST ----------" << std::endl;
-  char char_write[] = "A";
-  bytes_written = client.write(fd, char_write, strlen(char_write));
-  std::cout << "write returned: " << bytes_written << std::endl;
-  sleep(1);
-  
-  // SEEK
-  std::cout << "------------ DECAFS CLIENT SEEK TEST ----------" << std::endl;
-  offset = client.lseek(fd, 0, SEEK_SET);
-  std::cout << "seek returned: " << offset << std::endl;
-  sleep(1);
-
-  // READ
-  std::cout << "------------ DECAFS CLIENT READ TEST ----------" << std::endl;
-  bytes_read = client.read(fd, testread, strlen(testwrite));
-  std::cout << "read returned: " << bytes_read << std::endl;
-  sleep(1);
-  
-  // CLOSE
-  std::cout << "------------ DECAFS CLIENT CLOSE TEST ----------" << std::endl;
-  close = client.close(fd);
-  std::cout << "close returned: " << close << std::endl;
-
-  // FILE STORAGE STAT
-  std::cout << "------------ DECAFS CLIENT FILE STORAGE STAT TEST ----------" << std::endl;
-  client.file_storage_stat(filename);
-  sleep(1);
-
-  /*
-  // DELETE
-  std::cout << "------------ DECAFS CLIENT DELETE TEST ----------" << std::endl;
-  client.remove_file(filename);
-  sleep(1);
-
-  // FILE STORAGE STAT
-  std::cout << "------------ DECAFS CLIENT FILE STORAGE STAT TEST ----------" << std::endl;
-  client.file_storage_stat(filename);
-  sleep(1);
-  */
   return 0;
 }
