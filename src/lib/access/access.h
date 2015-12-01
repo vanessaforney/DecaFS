@@ -5,7 +5,6 @@
 
 #include "network_core/barista_network_helper.h"
 #include "barista_core/barista_core.h"
-#include "io_manager/io_manager.h"
 
 #define DATA_NOT_FOUND -1
 #define NETWORK_READ 0

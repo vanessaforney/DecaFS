@@ -1,7 +1,6 @@
 #include "access.h"
 
 /* TODO:
- *    - Need to check if chunk exists.
  *    - Need to make the stripe width 3 
  *    - Need to prevent replica nodes from being made
  */
@@ -96,9 +95,7 @@ ssize_t process_write_chunk (uint32_t request_id, int fd, int file_id,
   memcpy(stripe_id_to_val[chunk.stripe_id], buf, count);
 
   for (int node = 1; node < 4; node++) {
-    // TODO: FIX
-    // if (node != node_id && chunk_exists(chunk)) {
-    if (node != node_id) {
+    if (node != node_id && chunk_exists(chunk)) {
       read_request_id = get_new_request_id();
       request_id_to_type[read_request_id] = NETWORK_WRITE;
       process_read_chunk (read_request_id, fd, chunk.file_id, node,
@@ -142,9 +139,7 @@ void remove_node_down(int node_id) {
     stripe_id_to_val[chunk.stripe_id] = calloc(it->count, 1);
 
     for (int node = 1; node < 5; node++) {
-      // TODO: FIX
-      // if (node != node_id && chunk_exists(chunk)) {
-      if (node != node_id) {
+      if (node != node_id && chunk_exists(chunk)) {
         request_id = get_new_request_id();
         request_id_to_type[request_id] = NETWORK_WRITE;
         process_read_chunk (request_id, it->fd, chunk.file_id, node,

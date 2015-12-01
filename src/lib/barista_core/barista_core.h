@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <math.h>
 
 #include <limits>
 
@@ -137,6 +138,8 @@ struct write_request_info {
     this->count = 0;
   }
 };
+
+extern "C" bool chunk_exists (struct file_chunk chunk);
 
 extern "C" const char *get_size_error_message (const char *type, const char *value);
 

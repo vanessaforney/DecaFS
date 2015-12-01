@@ -79,7 +79,7 @@ void IO_Manager::process_write_stripe (uint32_t request_id,
                                        uint32_t chunk_size, const void *buf,
                                        int offset, size_t count) {
   uint32_t chunk_id, bytes_written = 0, write_size = 0;
-  int chunk_offset, node_id, replica_node_id, write_result;
+  int chunk_offset, node_id, write_result;
 
   assert (((int)count - offset) <= (int)stripe_size);
   printf ("\n(BARISTA) Process Write Stripe\n");
@@ -96,15 +96,7 @@ void IO_Manager::process_write_stripe (uint32_t request_id,
       chunk_to_node[cur_chunk] = node_id;
     }
 
-    // If the replica does not exist, create it
-    if (!chunk_replica_exists (cur_chunk)) {
-      replica_node_id = put_replica (file_id, pathname, stripe_id, chunk_id);
-      printf ("\tchunk replica doesn't exist. Preparing to send chunk replica to node %d\n", 
-                 replica_node_id);
-      chunk_to_replica_node[cur_chunk] = replica_node_id;
-    }
-
-    // Ensure that we have the proper node and replica id's to send data to
+    // Ensure that we have the proper node id to send data to
     node_id = chunk_to_node[cur_chunk];
 
     // Determine the size of the write
