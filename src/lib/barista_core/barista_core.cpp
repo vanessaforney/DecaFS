@@ -33,6 +33,8 @@ std::map<struct write_request, struct write_request_info> active_write_requests;
 
 std::map<uint32_t, struct request_info> active_delete_requests;
 
+std::set<uint32_t> recover_node_request_ids;
+
 // ------------------------IO Manager Call Throughs---------------------------
 extern "C" uint32_t process_read_stripe (uint32_t request_id, uint32_t file_id,
                                          char *pathname, uint32_t stripe_id,
@@ -330,6 +332,13 @@ void get_first_stripe (uint32_t *id, int *stripe_offset, uint32_t stripe_size,
   *stripe_offset = 0;
 }
 
+void add_recover_node_request_id(uint32_t request_id) {
+  recover_node_request_ids.insert(request_id);
+}
+
+void remove_recover_node_request_id(uint32_t request_id) {
+  recover_node_request_ids.erase(request_id);
+}
 
 bool read_request_exists (uint32_t request_id) {
   return (active_read_requests.find (request_id) != active_read_requests.end());
@@ -641,6 +650,13 @@ extern "C" void read_file (int fd, size_t count, struct client client) {
 }
 
 extern "C" void read_response_handler (ReadChunkResponse *read_response) {
+  if (std::find(recover_node_request_ids.begin(), 
+                recover_node_request_ids.end(), read_response->id) !=
+      recover_node_request_ids.end()) {
+    remove_recover_node_request_id(read_response->id);
+    return;
+  }
+
   assert (read_request_exists (read_response->id));
   
   struct file_chunk chunk = {read_response->file_id, read_response->stripe_id,
@@ -754,6 +770,13 @@ extern "C" void write_file (int fd, const void *buf, size_t count, struct client
 }
 
 extern "C" void write_response_handler (WriteChunkResponse *write_response) {
+  if (std::find(recover_node_request_ids.begin(), 
+                recover_node_request_ids.end(), write_response->id) !=
+      recover_node_request_ids.end()) {
+    remove_recover_node_request_id(write_response->id);
+    return;
+  }
+
   assert (write_request_exists (write_response->id));
 
   struct write_request request = write_request_lookups[write_response->id];

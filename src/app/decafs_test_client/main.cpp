@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
   }
   sleep(1);
 
-  /* Writes to file. */
+  // /* Writes to file. */
   printf("------------ DECAFS CLIENT WRITE TEST 1 ------------\n");
   bytes = client.write(fd, first_write, strlen(first_write));
   check_num_bytes(bytes, strlen(first_write));

@@ -273,4 +273,11 @@ extern "C" void move_chunk_replica (const char* pathname, uint32_t stripe_id,
 extern "C" void fmove_chunk_replica (uint32_t file_id, uint32_t stripe_id,
                                      uint32_t chunk_num, uint32_t dest_node,
                                      struct client client);
+
+/*
+ * Adds and removes recover node request id.
+ */
+extern "C" void add_recover_node_request_id(uint32_t request_id);
+extern "C" void remove_recover_node_request_id(uint32_t request_id);
+
 #endif
