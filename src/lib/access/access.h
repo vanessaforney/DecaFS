@@ -9,6 +9,7 @@
 #define DATA_NOT_FOUND -1
 #define NETWORK_READ 0
 #define NETWORK_WRITE 1
+#define READ_THREE_NODES -1
 
 struct NetworkChunk {
   int node_id;

@@ -31,7 +31,7 @@ void process_xor_read_chunk(int node_id, struct file_chunk chunk, int fd,
 
 /* Updates node. */
 void update_node(int node_id, struct file_chunk chunk, int fd, int offset,
-                 void *buf, int count, int type) {
+                 void *buf, int count, int type, int curr_node_id) {
   /* Stores node id of the stripe being updated. */
   free(stripe_id_to_val[chunk.stripe_id]);
   stripe_id_to_val[chunk.stripe_id] = calloc(count, 1);
@@ -40,8 +40,8 @@ void update_node(int node_id, struct file_chunk chunk, int fd, int offset,
   stripe_id_to_requests[chunk.stripe_id].clear();
 
   /* Creates read requests for the nodes. */
-  for (int node = 1; node < 4; node++) {
-    if (node != node_id && chunk_exists(chunk)) {
+  for (int node = 1; node < 5; node++) {
+    if (node != node_id && chunk_exists(chunk) && node != curr_node_id) {
       process_xor_read_chunk(node, chunk, fd, offset, count);
     }
   }
@@ -104,7 +104,8 @@ ssize_t process_read_chunk (uint32_t request_id, int fd, int file_id,
   }
   
   /* Get other node information to create XOR if node is down. */
-  update_node(node_id, chunk, fd, offset, buf, count, NETWORK_READ);
+  update_node(node_id, chunk, fd, offset, buf, count, NETWORK_READ,
+              READ_THREE_NODES);
   return NODE_FAILURE;
 }
 
@@ -115,7 +116,7 @@ ssize_t process_write_chunk (uint32_t request_id, int fd, int file_id,
   struct file_chunk chunk = { file_id, stripe_id, chunk_num };
 
   /* Updates parity node. */
-  update_node(4, chunk, fd, offset, buf, count, NETWORK_WRITE);
+  update_node(4, chunk, fd, offset, buf, count, NETWORK_WRITE, node_id);
   memcpy(stripe_id_to_val[chunk.stripe_id], buf, count);
 
   if (is_node_up(node_id)) {
@@ -145,6 +146,6 @@ void remove_node_down(int node_id) {
   for (it = node_to_chunks[node_id].begin();
        it != node_to_chunks[node_id].end(); ++it) {
     update_node(node_id, it->chunk, it->fd, it->offset, NULL, it->count,
-                NETWORK_WRITE);
+                NETWORK_WRITE, READ_THREE_NODES);
   }
 }
