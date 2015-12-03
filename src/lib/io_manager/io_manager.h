@@ -32,7 +32,6 @@ using namespace std;
 class IO_Manager {
   private:
     // Variables
-    PersistentMap<struct file_chunk, int> chunk_to_node;
     PersistentMap<struct file_chunk, int> chunk_to_replica_node;
     //map<struct file_chunk, int> chunk_to_node;
     //map<struct file_chunk, int> chunk_to_replica_node;
@@ -51,6 +50,9 @@ class IO_Manager {
 
   public:
     IO_Manager();
+
+    /* Variables. */
+    PersistentMap<struct file_chunk, int> chunk_to_node;
     
     void init(char *metadata_path);
 

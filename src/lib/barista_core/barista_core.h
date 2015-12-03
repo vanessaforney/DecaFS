@@ -141,6 +141,8 @@ struct write_request_info {
 
 extern "C" bool chunk_exists (struct file_chunk chunk);
 
+extern "C" void create_chunk (struct file_chunk cur_chunk);
+
 extern "C" const char *get_size_error_message (const char *type, const char *value);
 
 extern "C" void exit_failure (const char *message);

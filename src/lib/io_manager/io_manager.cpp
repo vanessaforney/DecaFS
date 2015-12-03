@@ -91,7 +91,7 @@ void IO_Manager::process_write_stripe (uint32_t request_id,
     
     // If the chunk does not exists, create it
     if (!chunk_exists (cur_chunk)) {
-      node_id = put_chunk (file_id, pathname, stripe_id, chunk_id);
+      node_id = put_chunk (chunk_id);
       printf ("\tchunk doesn't exist. Preparing to send chunk to node %d\n", node_id);
       chunk_to_node[cur_chunk] = node_id;
     }

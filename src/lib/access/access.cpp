@@ -9,11 +9,14 @@ static std::map<int, int> stripe_id_to_type;
 /* Map of stripe id to list of requests for that stripe. */
 static std::map<int, std::list<int>> stripe_id_to_requests;
 
-/* Map of strip id to the node to update when all requests complete. */
+/* Map of stripe id to the node to update when all requests complete. */
 static std::map<int, int> stripe_id_to_node;
 
-/* Map of strip id to the current XOR value. */
+/* Map of stripe id to the current XOR value. */
 static std::map<int, void *> stripe_id_to_val;
+
+/* Map of stripe id to request id. */
+static std::map<int, uint32_t> stripe_id_to_request_id;
 
 
 // ------------------------Helper Functions-------------------------
@@ -22,7 +25,6 @@ void process_xor_read_chunk(int node_id, struct file_chunk chunk, int fd,
                             int offset, int count) {
   int request_id = get_new_request_id();
   stripe_id_to_requests[chunk.stripe_id].push_back(request_id);
-
   add_recover_node_request_id(request_id);
   process_read_chunk(request_id, fd, chunk.file_id, node_id, chunk.stripe_id,
                      chunk.chunk_num, offset, NULL, count);
@@ -41,8 +43,10 @@ void update_node(int node_id, struct file_chunk chunk, int fd, int offset,
 
   /* Creates read requests for the nodes. */
   for (int node = 1; node < 5; node++) {
-    if (node != node_id && chunk_exists(chunk) && node != curr_node_id) {
-      process_xor_read_chunk(node, chunk, fd, offset, count);
+    struct file_chunk new_chunk = { 
+      chunk.file_id, chunk.stripe_id, chunk.chunk_num - curr_node_id + node };
+    if (node != node_id && chunk_exists(new_chunk)) {
+      process_xor_read_chunk(node, new_chunk, fd, offset, count);
     }
   }
 }
@@ -63,7 +67,7 @@ void process_read_chunk_response(ReadChunkResponse *read_chunk_response) {
   int size = read_chunk_response->count;
 
   if (stripe_id_to_requests.count(stripe_id)) {
-    std::list<int> ids = stripe_id_to_requests[stripe_id];
+    std::list<int>& ids = stripe_id_to_requests[stripe_id];
 
     /* If the request id is found compute xor. */
     if (std::find(ids.begin(), ids.end(), current_request_id) != ids.end()) {
@@ -74,18 +78,35 @@ void process_read_chunk_response(ReadChunkResponse *read_chunk_response) {
 
       /* If the XOR is fully computed then handle. */
       if (ids.size() == 0) {
+        int node_id = stripe_id_to_node[stripe_id];
+
         if (stripe_id_to_type[stripe_id] == NETWORK_WRITE) {
-          /* Create new write request if network write. */
-          int node_id = stripe_id_to_node[stripe_id];
+          /* Creates chunk. */
           int request_id = get_new_request_id();
+          struct file_chunk cur_chunk = { read_chunk_response->file_id,
+                                          stripe_id, node_id };
+          create_chunk(cur_chunk);
+
+          /* Create new write request if network write. */
+          add_recover_node_request_id(request_id);
           network_write_chunk(request_id, read_chunk_response->fd,
-                              read_chunk_response->file_id, node_id,
-                              stripe_id, read_chunk_response->chunk_num,
+                              cur_chunk.file_id, node_id,
+                              cur_chunk.stripe_id, cur_chunk.chunk_num,
                               read_chunk_response->offset,
                               stripe_id_to_val[stripe_id], size);
         } else {
           /* Otherwise send the data back to the user. */
-          send(read_chunk_response->fd, stripe_id_to_val[stripe_id], size, 0);
+          auto read_response = new ReadChunkResponse(
+            stripe_id_to_val[stripe_id], size);
+          read_response->id = stripe_id_to_request_id[stripe_id];
+          read_response->fd = read_chunk_response->fd;
+          read_response->file_id = read_chunk_response->file_id;
+          read_response->stripe_id = stripe_id;
+          read_response->chunk_num = node_id;
+          read_response->offset = read_chunk_response->offset;
+          read_response->count = size;
+
+          read_response_handler(read_response);
         }
       }
     }
@@ -104,9 +125,9 @@ ssize_t process_read_chunk (uint32_t request_id, int fd, int file_id,
   }
   
   /* Get other node information to create XOR if node is down. */
-  update_node(node_id, chunk, fd, offset, buf, count, NETWORK_READ,
-              READ_THREE_NODES);
-  return NODE_FAILURE;
+  stripe_id_to_request_id[stripe_id] = request_id;
+  update_node(node_id, chunk, fd, offset, buf, count, NETWORK_READ, node_id);
+  return 0;
 }
 
 
@@ -117,7 +138,6 @@ ssize_t process_write_chunk (uint32_t request_id, int fd, int file_id,
 
   /* Updates parity node. */
   update_node(4, chunk, fd, offset, buf, count, NETWORK_WRITE, node_id);
-  memcpy(stripe_id_to_val[chunk.stripe_id], buf, count);
 
   if (is_node_up(node_id)) {
     /* Writes the chunk back through the network if node is up. */
@@ -146,6 +166,6 @@ void remove_node_down(int node_id) {
   for (it = node_to_chunks[node_id].begin();
        it != node_to_chunks[node_id].end(); ++it) {
     update_node(node_id, it->chunk, it->fd, it->offset, NULL, it->count,
-                NETWORK_WRITE, READ_THREE_NODES);
+                NETWORK_WRITE, node_id);
   }
 }

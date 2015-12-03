@@ -111,6 +111,14 @@ extern "C" bool chunk_exists (struct file_chunk chunk) {
   return io_manager.chunk_exists(chunk);
 }
 
+extern "C" void create_chunk (struct file_chunk cur_chunk) {
+  if (!chunk_exists (cur_chunk)) {
+    int node_id = put_chunk (cur_chunk.chunk_num);
+    printf ("\tchunk doesn't exist. Preparing to send chunk to node %d\n", node_id);
+    io_manager.chunk_to_node[cur_chunk] = node_id;
+  }
+}
+
 // ------------------------Persistent Metadata Call Throughs---------------------------
 extern "C" int get_num_files (struct client client) {
   int res;
