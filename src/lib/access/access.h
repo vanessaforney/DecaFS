@@ -12,6 +12,7 @@
 #define NETWORK_WRITE 1
 #define READ_THREE_NODES -1
 #define SIZE_BUFFER 128
+#define HEADER_SIZE 12
 
 struct NetworkChunk {
   int node_id;

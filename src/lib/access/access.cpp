@@ -78,10 +78,6 @@ void process_read_chunk_response(ReadChunkResponse *read_chunk_response) {
     /* If the request id is found compute xor. */
     if (std::find(ids.begin(), ids.end(), current_request_id) != ids.end()) {
       /* Compute xor and remove request id. */
-      printf("INSIDE XOR with node id: %d\n", stripe_id_to_node[stripe_id]);
-      printf("\t\t OTHER node id: %d\n", read_chunk_response->chunk_num);
-      printf("\t\t SIZE: %d\n", size);
-
       compute_xor((char *)stripe_id_to_val[stripe_id],
                   (char *)read_chunk_response->data_buffer, size);
       ids.remove(current_request_id);
@@ -107,14 +103,10 @@ void process_read_chunk_response(ReadChunkResponse *read_chunk_response) {
         } else {
           /* Otherwise send the data back to the user. */
           auto read_response = new ReadChunkResponse(
-            stripe_id_to_val[stripe_id], size);
-          read_response->id = stripe_id_to_request_id[stripe_id];
-          read_response->fd = read_chunk_response->fd;
-          read_response->file_id = read_chunk_response->file_id;
-          read_response->stripe_id = stripe_id;
-          read_response->chunk_num = node_id;
-          read_response->offset = read_chunk_response->offset;
-          read_response->count = size;
+            stripe_id_to_request_id[stripe_id], read_chunk_response->fd, 
+            read_chunk_response->file_id, stripe_id, node_id, 
+            read_chunk_response->offset, size,
+            (const uint8_t *) stripe_id_to_val[stripe_id]);
 
           read_response_handler(read_response);
         }
