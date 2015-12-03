@@ -18,6 +18,9 @@ static std::map<int, void *> stripe_id_to_val;
 /* Map of stripe id to request id. */
 static std::map<int, uint32_t> stripe_id_to_request_id;
 
+/* Mutex for computing the XOR. */
+static std::mutex xor_mutex;
+
 
 // ------------------------Helper Functions-------------------------
 /* Processes new read chunk to generate the XOR value. */
@@ -34,6 +37,7 @@ void process_xor_read_chunk(int node_id, struct file_chunk chunk, int fd,
 /* Updates node. */
 void update_node(int node_id, struct file_chunk chunk, int fd, int offset,
                  void *buf, int count, int type, int curr_node_id) {
+  xor_mutex.lock();
   /* Stores node id of the stripe being updated. */
   free(stripe_id_to_val[chunk.stripe_id]);
   stripe_id_to_val[chunk.stripe_id] = calloc(count, 1);
@@ -49,6 +53,7 @@ void update_node(int node_id, struct file_chunk chunk, int fd, int offset,
       process_xor_read_chunk(node, new_chunk, fd, offset, count);
     }
   }
+  xor_mutex.unlock();
 }
 
 
@@ -62,6 +67,7 @@ void compute_xor(char *buf1, char *buf2, int size) {
 
 // ------------------------Core Functions---------------------------
 void process_read_chunk_response(ReadChunkResponse *read_chunk_response) {
+  xor_mutex.lock();
   int stripe_id = read_chunk_response->stripe_id;
   int current_request_id = read_chunk_response->id;
   int size = read_chunk_response->count;
@@ -72,6 +78,10 @@ void process_read_chunk_response(ReadChunkResponse *read_chunk_response) {
     /* If the request id is found compute xor. */
     if (std::find(ids.begin(), ids.end(), current_request_id) != ids.end()) {
       /* Compute xor and remove request id. */
+      printf("INSIDE XOR with node id: %d\n", stripe_id_to_node[stripe_id]);
+      printf("\t\t OTHER node id: %d\n", read_chunk_response->chunk_num);
+      printf("\t\t SIZE: %d\n", size);
+
       compute_xor((char *)stripe_id_to_val[stripe_id],
                   (char *)read_chunk_response->data_buffer, size);
       ids.remove(current_request_id);
@@ -111,6 +121,7 @@ void process_read_chunk_response(ReadChunkResponse *read_chunk_response) {
       }
     }
   }
+  xor_mutex.unlock();
 }
 
 ssize_t process_read_chunk (uint32_t request_id, int fd, int file_id,

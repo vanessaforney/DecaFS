@@ -2,6 +2,7 @@
 #define __ACCESS_H__
 
 #include <sys/types.h>
+#include <mutex>
 
 #include "network_core/barista_network_helper.h"
 #include "barista_core/barista_core.h"
