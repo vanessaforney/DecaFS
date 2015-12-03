@@ -78,8 +78,10 @@ void process_read_chunk_response(ReadChunkResponse *read_chunk_response) {
     /* If the request id is found compute xor. */
     if (std::find(ids.begin(), ids.end(), current_request_id) != ids.end()) {
       /* Compute xor and remove request id. */
+      sleep(1);
       compute_xor((char *)stripe_id_to_val[stripe_id],
                   (char *)read_chunk_response->data_buffer, size);
+      sleep(1);
       ids.remove(current_request_id);
 
       /* If the XOR is fully computed then handle. */
